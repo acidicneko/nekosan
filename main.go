@@ -36,10 +36,12 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Event Handlers
+	bot.AddHandler(handlers.GuildCreateHandler)
 	bot.AddHandler(handlers.MessageCreateHandler)
 
 	// Required INTENTS
-	bot.Identify.Intents = discordgo.IntentsGuildMessages
+	bot.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages
 
 	commands.InitCommands()
 

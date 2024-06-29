@@ -20,6 +20,7 @@ func InitCommands() {
 	registerCommand(version)
 	registerCommand(usage)
 	registerCommand(off)
+	registerCommand(quote)
 }
 
 func registerCommand(command cmdlet) {
