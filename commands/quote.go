@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -32,9 +33,34 @@ var quote = cmdlet{
 			fmt.Printf("could not unmarshal json: %s\n", err1)
 			return
 		}
-		_, err2 := bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("`%s`\n     ~ %s", data["q"], data["a"]))
-		if err2 != nil {
-			fmt.Println("Error while sending messages!")
+		quote := fmt.Sprintf("%s", data["q"])
+		author := fmt.Sprintf("%s", data["a"])
+
+		embed := &discordgo.MessageEmbed{
+			Title: "Get up you dead soul!",
+			Author: &discordgo.MessageEmbedAuthor{
+				Name:    event.Author.Username,
+				IconURL: event.Author.AvatarURL(""),
+			},
+			Color:       0x00ff00, // Green
+			Description: quote,
+			Fields: []*discordgo.MessageEmbedField{
+				{
+					Name:   "By",
+					Value:  author,
+					Inline: false,
+				},
+			},
+			Thumbnail: &discordgo.MessageEmbedThumbnail{
+				URL: "https://c4.wallpaperflare.com/wallpaper/186/380/857/your-name-sky-stars-kimi-no-na-wa-wallpaper-preview.jpg",
+			},
+			Timestamp: time.Now().Format(time.RFC3339), // Discord wants ISO8601; RFC3339 is an extension of ISO8601 and should be completely compatible.
+			Footer: &discordgo.MessageEmbedFooter{
+				Text:    "NekoSan",
+				IconURL: bot.State.User.AvatarURL(""),
+			},
 		}
+		bot.ChannelMessageSendEmbed(event.ChannelID, embed)
+
 	},
 }
