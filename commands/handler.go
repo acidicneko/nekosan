@@ -21,6 +21,7 @@ func InitCommands() {
 	registerCommand(usage)
 	registerCommand(off)
 	registerCommand(quote)
+	registerCommand(list)
 }
 
 func registerCommand(command cmdlet) {
