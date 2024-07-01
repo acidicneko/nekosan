@@ -22,6 +22,7 @@ func InitCommands() {
 	registerCommand(off)
 	registerCommand(quote)
 	registerCommand(list)
+	registerCommand(kick)
 }
 
 func registerCommand(command cmdlet) {

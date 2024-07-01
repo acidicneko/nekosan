@@ -10,6 +10,7 @@ import (
 	"github.com/acidicneko/nekosan/commands"
 	"github.com/acidicneko/nekosan/console"
 	"github.com/acidicneko/nekosan/handlers"
+	"github.com/acidicneko/nekosan/utils"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -36,6 +37,7 @@ func main() {
 		os.Exit(1)
 	}
 
+	utils.ActiveGuilds = make(map[string]*discordgo.Guild)
 	// Event Handlers
 	bot.AddHandler(handlers.GuildCreateHandler)
 	bot.AddHandler(handlers.MessageCreateHandler)
