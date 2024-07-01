@@ -2,6 +2,7 @@ package utils
 
 import (
 	"os"
+	"sync"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -10,6 +11,7 @@ var Prefix string = os.Getenv("BOT_PREFIX")
 var Version string = "0.0.1"
 
 var ActiveGuilds map[string]*discordgo.Guild
+var ActiveGuildsMutex = sync.RWMutex{}
 
 func MemberHasPermission(s *discordgo.Session, guildID string, userID string, permission int64) (bool, error) {
 	member, err := s.State.Member(guildID, userID)

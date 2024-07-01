@@ -14,6 +14,9 @@ func GuildCreateHandler(bot *discordgo.Session, event *discordgo.GuildCreate) {
 			bot.ChannelMessageSend(channels[i].ID, "NekoSan is online!")
 		}
 	}
+	utils.ActiveGuildsMutex.Lock()
 	utils.ActiveGuilds[event.Guild.ID] = event.Guild
+	utils.ActiveGuildsMutex.Unlock()
+
 	fmt.Printf("Guild Loaded: %s\n", event.Guild.Name)
 }
