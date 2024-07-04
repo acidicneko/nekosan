@@ -43,7 +43,7 @@ func main() {
 	bot.AddHandler(handlers.MessageCreateHandler)
 
 	// Required INTENTS
-	bot.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages
+	bot.Identify.Intents = discordgo.IntentsGuilds | discordgo.IntentsGuildMessages | discordgo.IntentsGuildVoiceStates
 
 	commands.InitCommands()
 

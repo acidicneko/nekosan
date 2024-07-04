@@ -23,7 +23,7 @@ var version = cmdlet{
 			Fields: []*discordgo.MessageEmbedField{
 				{
 					Name:   "Version",
-					Value:  "v" + utils.Version,
+					Value:  utils.Version,
 					Inline: false,
 				},
 				{
