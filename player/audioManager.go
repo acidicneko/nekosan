@@ -29,12 +29,13 @@ const (
 )
 
 type GuildAudioManager struct {
-	VoiceConn     *discordgo.VoiceConnection
-	Queue         *Song
-	QueueList     []*Song
-	SkipInterrupt chan bool
-	CurrentStream *dca.StreamingSession
-	BotStatus     Status
+	VoiceConn            *discordgo.VoiceConnection
+	Queue                *Song
+	QueueList            []*Song
+	SkipInterrupt        chan bool
+	CurrentStream        *dca.StreamingSession
+	CurrentEncodeSession *dca.EncodeSession
+	BotStatus            Status
 }
 
 // TODO: This should have a mutex
@@ -78,6 +79,7 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 	options.Application = "lowdelay"
 
 	encodingSession, err := dca.EncodeFile(song.DownloadUrl, options)
+	mb.CurrentEncodeSession = encodingSession
 	if err != nil {
 		log.Println("Error encoding from yt url")
 		log.Println(err.Error())
@@ -141,7 +143,6 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 		mb.VoiceConn.Speaking(false)
 		break
 	case <-mb.SkipInterrupt:
-		log.Println("Song interrupted, stop playing")
 		mb.VoiceConn.Speaking(false)
 		return
 	}
@@ -216,9 +217,8 @@ func (mb *GuildAudioManager) Skip(session *discordgo.Session, event *discordgo.M
 		mb.Stop()
 	} else {
 		if len(mb.SkipInterrupt) == 0 {
-			mb.SkipInterrupt <- true
-			time.Sleep(250 * time.Millisecond)
-			mb.PlaySong(session, event)
+			session.ChannelMessageSend(event.ChannelID, "Skipping current song.")
+			mb.CurrentEncodeSession.Cleanup()
 		}
 	}
 }

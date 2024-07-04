@@ -38,7 +38,7 @@ var play = cmdlet{
 			query += k
 			query += " "
 		}
-		query = strings.TrimPrefix(query, " ")
+		query = strings.TrimSuffix(query, " ")
 		//url, e := player.FindYTSong(query)
 		msg, _ := bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Searching YT for: `%s`", query))
 		url, e := player.FindYTSongYTDLP(query)
