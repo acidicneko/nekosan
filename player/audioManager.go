@@ -109,6 +109,11 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 				Value:  song.Author,
 				Inline: false,
 			},
+			{
+				Name:   "Duration",
+				Value:  song.Duration.String(),
+				Inline: false,
+			},
 		},
 		Thumbnail: &discordgo.MessageEmbedThumbnail{
 			URL: "https://img.youtube.com/vi/" + song.ID + "/hqdefault.jpg",
@@ -171,6 +176,11 @@ func (mb *GuildAudioManager) Enqueue(session *discordgo.Session, event *discordg
 			{
 				Name:   "By",
 				Value:  song.Author,
+				Inline: false,
+			},
+			{
+				Name:   "Duration",
+				Value:  song.Duration.String(),
 				Inline: false,
 			},
 		},
