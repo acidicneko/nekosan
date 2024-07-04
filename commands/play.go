@@ -39,7 +39,9 @@ var play = cmdlet{
 			query += " "
 		}
 		query = strings.TrimPrefix(query, " ")
-		url, e := player.FindYTSong(query)
+		//url, e := player.FindYTSong(query)
+		msg, _ := bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Searching YT for: `%s`", query))
+		url, e := player.FindYTSongYTDLP(query)
 		if e != nil {
 			bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Failed to fetch query from YT: `%s`", query))
 			return
@@ -49,6 +51,7 @@ var play = cmdlet{
 			bot.ChannelMessageSend(event.ChannelID, "Error while fetching the song!")
 			return
 		}
+		bot.ChannelMessageDelete(event.ChannelID, msg.ID)
 		AudioManager.Enqueue(bot, event, song)
 		if AudioManager.BotStatus == player.Resting {
 			AudioManager.PlaySong(bot, event)

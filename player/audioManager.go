@@ -55,6 +55,10 @@ func findAudioFormat(formats youtube.FormatList) *youtube.Format {
 func GetSongInfo(url string) (*Song, error) {
 	client := youtube.Client{}
 	sng, err := client.GetVideo(url)
+	if err != nil {
+		log.Printf("Error while retrieving song %v\n", err)
+		return nil, err
+	}
 	downloadURL, _ := client.GetStreamURL(sng, findAudioFormat(sng.Formats))
 	return &Song{
 		Name:        sng.Title,
