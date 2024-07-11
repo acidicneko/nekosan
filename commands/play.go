@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/acidicneko/nekosan/player"
@@ -39,20 +40,42 @@ var play = cmdlet{
 			query += " "
 		}
 		query = strings.TrimSuffix(query, " ")
-		//url, e := player.FindYTSong(query)
-		msg, _ := bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Searching YT for: `%s`", query))
-		url, e := player.FindYTSongYTDLP(query)
-		if e != nil {
-			bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Failed to fetch query from YT: `%s`", query))
-			return
+		url := query
+		var msg *discordgo.Message
+		var e error
+		if !strings.HasPrefix(query, "https://www.youtube.com/watch?v=") && !strings.Contains(query, "list=") {
+			msg, _ = bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Searching YT for: `%s`", query))
+			url, e = player.FindYTSongYTDLP(query)
+			if e != nil {
+				bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Failed to fetch query from YT: `%s`", query))
+				return
+			}
+			bot.ChannelMessageDelete(event.ChannelID, msg.ID)
 		}
-		song, err := player.GetSongInfo(url)
-		if err != nil {
-			bot.ChannelMessageSend(event.ChannelID, "Error while fetching the song!")
-			return
+		if strings.Contains(url, "list=") {
+			playlist, err := player.GetPlaylistInfo(url)
+			if err != nil {
+				bot.ChannelMessageSend(event.ChannelID, "Failed to retrieve playlist!")
+				return
+			}
+			for _, item := range playlist.Videos {
+				log.Printf("ID: %s\n", item.ID)
+				song, err := player.GetSongInfo(item.ID)
+				if err != nil {
+					bot.ChannelMessageSend(event.ChannelID, "Error while fetching the songs from playlist!")
+					return
+				}
+				AudioManager.Enqueue(bot, event, song)
+				bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Finished loading songs from playlist: `%s`", playlist.Title))
+			}
+		} else {
+			song, err := player.GetSongInfo(url)
+			if err != nil {
+				bot.ChannelMessageSend(event.ChannelID, "Error while fetching the song via URL!")
+				return
+			}
+			AudioManager.Enqueue(bot, event, song)
 		}
-		bot.ChannelMessageDelete(event.ChannelID, msg.ID)
-		AudioManager.Enqueue(bot, event, song)
 		if AudioManager.BotStatus == player.Resting {
 			AudioManager.PlaySong(bot, event)
 		}

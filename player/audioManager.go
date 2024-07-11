@@ -7,7 +7,6 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/jonas747/dca"
-	"github.com/kkdai/youtube/v2"
 )
 
 type Song struct {
@@ -40,36 +39,6 @@ type GuildAudioManager struct {
 
 // TODO: This should have a mutex
 var GuildAudioManagers = make(map[string]*GuildAudioManager)
-
-func findAudioFormat(formats youtube.FormatList) *youtube.Format {
-	var audioFormat *youtube.Format
-	var audioFormats youtube.FormatList = formats.Type("audio")
-
-	if len(audioFormats) > 0 {
-		audioFormats.Sort()
-		audioFormat = &audioFormats[0]
-	}
-
-	return audioFormat
-}
-
-func GetSongInfo(url string) (*Song, error) {
-	client := youtube.Client{}
-	sng, err := client.GetVideo(url)
-	if err != nil {
-		log.Printf("Error while retrieving song %v\n", err)
-		return nil, err
-	}
-	downloadURL, _ := client.GetStreamURL(sng, findAudioFormat(sng.Formats))
-	return &Song{
-		Name:        sng.Title,
-		Author:      sng.Author,
-		FullUrl:     url,
-		DownloadUrl: downloadURL,
-		Duration:    sng.Duration,
-		ID:          sng.ID,
-	}, err
-}
 
 func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discordgo.MessageCreate) {
 	song := mb.Dequeue()

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/acidicneko/nekosan/utils"
+	YT "github.com/kkdai/youtube/v2"
 	"google.golang.org/api/option"
 	"google.golang.org/api/youtube/v3"
 )
@@ -37,4 +38,43 @@ func FindYTSongYTDLP(query string) (url string, err error) {
 	}
 	result = strings.TrimSuffix(result, "\n")
 	return result, nil
+}
+
+func findAudioFormat(formats YT.FormatList) *YT.Format {
+	var audioFormat *YT.Format
+	var audioFormats YT.FormatList = formats.Type("audio")
+
+	if len(audioFormats) > 0 {
+		audioFormats.Sort()
+		audioFormat = &audioFormats[0]
+	}
+
+	return audioFormat
+}
+
+func GetSongInfo(url string) (*Song, error) {
+	client := YT.Client{}
+	sng, err := client.GetVideo(url)
+	if err != nil {
+		log.Printf("Error while retrieving song %v\n", err)
+		return nil, err
+	}
+	downloadURL, _ := client.GetStreamURL(sng, findAudioFormat(sng.Formats))
+	return &Song{
+		Name:        sng.Title,
+		Author:      sng.Author,
+		FullUrl:     url,
+		DownloadUrl: downloadURL,
+		Duration:    sng.Duration,
+		ID:          sng.ID,
+	}, err
+}
+
+func GetPlaylistInfo(url string) (*YT.Playlist, error) {
+	client := YT.Client{}
+	playlist, err := client.GetPlaylist(url)
+	if err != nil {
+		return nil, err
+	}
+	return playlist, nil
 }
