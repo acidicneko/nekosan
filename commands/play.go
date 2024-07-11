@@ -2,7 +2,7 @@ package commands
 
 import (
 	"fmt"
-	"log"
+	"strconv"
 	"strings"
 
 	"github.com/acidicneko/nekosan/player"
@@ -30,8 +30,8 @@ var play = cmdlet{
 		}
 		AudioManager, ok := player.GuildAudioManagers[event.GuildID]
 		if !ok {
-			bot.ChannelMessageSend(event.ChannelID, `Corrupted connection detected.\n
-				Try removing the bot and joining again to your voice channel`)
+			bot.ChannelMessageSend(event.ChannelID, "Corrupted connection detected.\n"+
+				"Try removing the bot and joining again to your voice channel")
 			return
 		}
 		query := ""
@@ -53,21 +53,30 @@ var play = cmdlet{
 			bot.ChannelMessageDelete(event.ChannelID, msg.ID)
 		}
 		if strings.Contains(url, "list=") {
-			playlist, err := player.GetPlaylistInfo(url)
+			playlist, err := player.GetPlaylistInfo(strings.Split(url, " ")[0])
 			if err != nil {
 				bot.ChannelMessageSend(event.ChannelID, "Failed to retrieve playlist!")
 				return
 			}
-			for _, item := range playlist.Videos {
-				log.Printf("ID: %s\n", item.ID)
+			for index, item := range playlist.Videos {
+				if len(args) == 2 {
+					i, e := strconv.Atoi(args[1])
+					if e != nil {
+						bot.ChannelMessageSend(event.ChannelID, "Cannot parse the number of items to load!")
+						return
+					}
+					if index == i {
+						break
+					}
+				}
 				song, err := player.GetSongInfo(item.ID)
 				if err != nil {
 					bot.ChannelMessageSend(event.ChannelID, "Error while fetching the songs from playlist!")
 					return
 				}
 				AudioManager.Enqueue(bot, event, song)
-				bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Finished loading songs from playlist: `%s`", playlist.Title))
 			}
+			bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Finished loading songs from playlist: `%s`", playlist.Title))
 		} else {
 			song, err := player.GetSongInfo(url)
 			if err != nil {
