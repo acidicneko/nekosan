@@ -9,7 +9,7 @@ import (
 
 var skip = cmdlet{
 	Name:  "skip",
-	Usage: "Play given video from YouTube",
+	Usage: "Skip current song in the queue.",
 	Run: func(args []string, bot *discordgo.Session, event *discordgo.MessageCreate) {
 		if vs, _ := bot.State.VoiceState(event.GuildID, bot.State.User.ID); vs == nil {
 			_, err := bot.ChannelMessageSend(event.ChannelID, "Not in any voice channel!")
