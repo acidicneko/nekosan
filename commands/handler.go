@@ -27,6 +27,7 @@ func InitCommands() {
 	registerCommand(leave)
 	registerCommand(play)
 	registerCommand(skip)
+	registerCommand(queue)
 }
 
 func registerCommand(command cmdlet) {
