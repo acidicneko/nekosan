@@ -56,7 +56,7 @@ var queue = cmdlet{
 				return
 			}
 			s, _ := strconv.Atoi(args[1])
-			bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Removing song `%s` from queue.", AudioManager.QueueList[s]))
+			bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Removing song `%s` from queue.", AudioManager.QueueList[s].Name))
 			AudioManager.QueueList = append(AudioManager.QueueList[:s-1], AudioManager.QueueList[s:]...)
 		}
 	},
