@@ -56,7 +56,11 @@ var queue = cmdlet{
 				return
 			}
 			s, _ := strconv.Atoi(args[1])
-			bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Removing song `%s` from queue.", AudioManager.QueueList[s].Name))
+      if len(AudioManager.QueueList) < s || s == 0{
+        bot.ChannelMessageSend(event.ChannelID, "No song at given index exists.")
+        return
+      }
+			bot.ChannelMessageSend(event.ChannelID, fmt.Sprintf("Removing song `%s` from queue.", AudioManager.QueueList[s-1].Name))
 			AudioManager.QueueList = append(AudioManager.QueueList[:s-1], AudioManager.QueueList[s:]...)
 		}
 	},
