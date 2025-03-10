@@ -70,7 +70,7 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 	// Use yt-dlp directly to stream audio to ffmpeg
 	// This command pipes the audio from yt-dlp directly to ffmpeg without saving to disk
 	ytdlp := exec.Command(
-		"./yt-dlp_linux",
+		"yt-dlp",
 		"--no-playlist",
 		"--force-generic-extractor",
 		"--youtube-skip-dash-manifest",
