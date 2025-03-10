@@ -52,6 +52,21 @@ func findAudioFormat(formats YT.FormatList) *YT.Format {
 	return audioFormat
 }
 
+func getAudioFormat(formats YT.FormatList) *YT.Format {
+	var audioFormat *YT.Format
+	for _, format := range formats {
+		if format.MimeType[:5] == "audio" { // Filter only audio formats
+			audioFormat = &format
+			break
+		}
+	}
+
+	if audioFormat == nil {
+		log.Fatalf("No suitable audio format found")
+	}
+	return audioFormat
+}
+
 func GetSongInfo(url string) (*Song, error) {
 	client := YT.Client{}
 	sng, err := client.GetVideo(url)
@@ -59,7 +74,7 @@ func GetSongInfo(url string) (*Song, error) {
 		log.Printf("Error while retrieving song %v\n", err)
 		return nil, err
 	}
-	downloadURL, _ := client.GetStreamURL(sng, findAudioFormat(sng.Formats))
+	downloadURL, _ := client.GetStreamURL(sng, getAudioFormat(sng.Formats))
 	return &Song{
 		Name:        sng.Title,
 		Author:      sng.Author,

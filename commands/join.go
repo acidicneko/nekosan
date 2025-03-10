@@ -46,8 +46,11 @@ var join = cmdlet{
 		}
 		vc, _ := bot.ChannelVoiceJoin(event.GuildID, vs.ChannelID, false, false)
 		player.GuildAudioManagers[event.GuildID] = &player.GuildAudioManager{
-			VoiceConn: vc,
-			BotStatus: player.Resting,
+			VoiceConn:     vc,
+			BotStatus:     player.Resting,
+			SkipInterrupt: make(chan bool),
+			StopPlayback:  make(chan bool),
+			QueueList:     make([]*player.Song, 0),
 		}
 	},
 }

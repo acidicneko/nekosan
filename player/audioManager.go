@@ -1,12 +1,15 @@
 package player
 
 import (
+	"encoding/binary"
 	"io"
 	"log"
+	"os/exec"
+	"strconv"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/jonas747/dca"
+	"layeh.com/gopus"
 )
 
 type Song struct {
@@ -21,6 +24,13 @@ type Song struct {
 type Status int32
 
 const (
+	channels  int = 2                   // 1 for mono, 2 for stereo
+	frameRate int = 48000               // Audio sampling rate
+	frameSize int = 960                 // uint16 size of each audio frame
+	maxBytes  int = (frameSize * 2) * 2 // Max size of opus data
+)
+
+const (
 	Resting Status = 0
 	Playing Status = 1
 	Paused  Status = 2
@@ -28,41 +38,115 @@ const (
 )
 
 type GuildAudioManager struct {
-	VoiceConn            *discordgo.VoiceConnection
-	Queue                *Song
-	QueueList            []*Song
-	SkipInterrupt        chan bool
-	CurrentStream        *dca.StreamingSession
-	CurrentEncodeSession *dca.EncodeSession
-	BotStatus            Status
+	VoiceConn     *discordgo.VoiceConnection
+	Queue         *Song
+	QueueList     []*Song
+	SkipInterrupt chan bool
+	StopPlayback  chan bool
+	BotStatus     Status
 }
 
 // TODO: This should have a mutex
 var GuildAudioManagers = make(map[string]*GuildAudioManager)
 
 func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discordgo.MessageCreate) {
-	song := mb.Dequeue()
-	options := dca.StdEncodeOptions
-	options.RawOutput = true
-	options.Bitrate = 96
-	options.Application = "lowdelay"
-
-	encodingSession, err := dca.EncodeFile(song.DownloadUrl, options)
-	mb.CurrentEncodeSession = encodingSession
-	if err != nil {
-		log.Println("Error encoding from yt url")
-		log.Println(err.Error())
+	if len(mb.QueueList) == 0 {
+		log.Println("Queue is empty")
+		mb.BotStatus = Resting
 		return
 	}
-	defer encodingSession.Cleanup()
-	time.Sleep(250 * time.Millisecond)
-	err = mb.VoiceConn.Speaking(true)
 
-	if err != nil {
-		log.Println("Error connecting to discord voice")
-		log.Println(err.Error())
-	}
+	song := mb.Dequeue()
 	mb.BotStatus = Playing
+
+	// Start speaking
+	err := mb.VoiceConn.Speaking(true)
+	if err != nil {
+		log.Println("Error setting speaking status:", err)
+		mb.BotStatus = Err
+		return
+	}
+
+	// Use yt-dlp directly to stream audio to ffmpeg
+	// This command pipes the audio from yt-dlp directly to ffmpeg without saving to disk
+	ytdlp := exec.Command(
+		"./yt-dlp_linux",
+		"--no-playlist",
+		"--force-generic-extractor",
+		"--youtube-skip-dash-manifest",
+		"--no-check-certificate",
+		"-f", "bestaudio",
+		"-o", "-",
+		"https://www.youtube.com/watch?v="+song.FullUrl,
+	)
+
+	ffmpeg := exec.Command(
+		"ffmpeg",
+		"-i", "pipe:0",
+		"-f", "s16le",
+		"-ar", strconv.Itoa(frameRate),
+		"-ac", strconv.Itoa(channels),
+		"pipe:1",
+	)
+
+	// Set up pipe between yt-dlp and ffmpeg
+	ytdlpout, err := ytdlp.StdoutPipe()
+	if err != nil {
+		log.Println("Error creating yt-dlp stdout pipe:", err)
+		mb.BotStatus = Err
+		return
+	}
+	ffmpeg.Stdin = ytdlpout
+
+	// Get ffmpeg output
+	ffmpegout, err := ffmpeg.StdoutPipe()
+	if err != nil {
+		log.Println("Error creating FFmpeg stdout pipe:", err)
+		mb.BotStatus = Err
+		return
+	}
+
+	// Set up error logging
+	ytdlp.Stderr = log.Writer()
+	ffmpeg.Stderr = log.Writer()
+
+	// Start yt-dlp
+	err = ytdlp.Start()
+	if err != nil {
+		log.Println("Error starting yt-dlp:", err)
+		mb.BotStatus = Err
+		return
+	}
+
+	// Start FFmpeg
+	err = ffmpeg.Start()
+	if err != nil {
+		log.Println("Error starting FFmpeg:", err)
+		ytdlp.Process.Kill()
+		mb.BotStatus = Err
+		return
+	}
+
+	// Create Opus encoder
+	opusEncoder, err := gopus.NewEncoder(frameRate, channels, gopus.Audio)
+	if err != nil {
+		log.Println("Error creating Opus encoder:", err)
+		ffmpeg.Process.Kill()
+		ytdlp.Process.Kill()
+		mb.BotStatus = Err
+		return
+	}
+
+	// Set the bitrate to 96 kbps (same as your DCA setting)
+	opusEncoder.SetBitrate(96000)
+
+	// Set the application to voice for low-delay (similar to your DCA setting)
+	opusEncoder.SetApplication(gopus.Voip)
+
+	// Buffer for reading PCM data
+	ffmpegbuf := make([]int16, frameSize*channels)
+
+	// Main playback loop
 	embed := &discordgo.MessageEmbed{
 		Title: ":notes: Now Playing",
 		Author: &discordgo.MessageEmbedAuthor{
@@ -90,44 +174,66 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 			URL: "https://img.youtube.com/vi/" + song.ID + "/hqdefault.jpg",
 		},
 		Color:     0x5e81ac,
-		Timestamp: time.Now().Format(time.RFC3339), // Discord wants ISO8601; RFC3339 is an extension of ISO8601 and should be completely compatible.
+		Timestamp: time.Now().Format(time.RFC3339),
 		Footer: &discordgo.MessageEmbedFooter{
 			Text:    "NekoSan",
 			IconURL: session.State.User.AvatarURL(""),
 		},
 	}
 	session.ChannelMessageSendEmbed(event.ChannelID, embed)
-	done := make(chan error)
-	stream := dca.NewStream(encodingSession, mb.VoiceConn, done)
-	mb.CurrentStream = stream
 
-	select {
-	case err := <-done:
-		log.Println("Song done")
-		if err != nil && err != io.EOF {
-			mb.BotStatus = Err
-			log.Println(err.Error())
+	playing := true
+	for playing {
+		// Read PCM data from ffmpeg
+		err = binary.Read(ffmpegout, binary.LittleEndian, &ffmpegbuf)
+		if err == io.EOF || err == io.ErrUnexpectedEOF {
+			log.Println("End of audio stream")
+			break
+		}
+		if err != nil {
+			log.Println("Error reading from FFmpeg:", err)
+			break
+		}
+
+		// Encode PCM data to Opus
+		opus, err := opusEncoder.Encode(ffmpegbuf, frameSize, maxBytes)
+		if err != nil {
+			log.Println("Error encoding to Opus:", err)
+			break
+		}
+
+		// Send Opus data to Discord
+		select {
+		case mb.VoiceConn.OpusSend <- opus:
+			// Data sent successfully
+		case <-mb.SkipInterrupt:
+			log.Println("Skipping current song")
+			playing = false
+		case <-mb.StopPlayback:
+			log.Println("Stopping playback")
+			playing = false
+			ytdlp.Process.Kill()
+			ffmpeg.Process.Kill()
+			mb.BotStatus = Resting
+			mb.VoiceConn.Speaking(false)
 			return
 		}
-		mb.VoiceConn.Speaking(false)
-		break
-	case <-mb.SkipInterrupt:
-		mb.VoiceConn.Speaking(false)
-		return
 	}
+
+	// Clean up
+	ytdlp.Process.Kill()
+	ffmpeg.Process.Kill()
 	mb.VoiceConn.Speaking(false)
 
-	if len(mb.QueueList) == 0 {
+	// Play next song if available
+	if len(mb.QueueList) > 0 {
 		time.Sleep(250 * time.Millisecond)
-		log.Println("Audio done")
-		mb.Stop()
+		log.Println("Playing next song in queue")
+		go mb.PlaySong(session, event)
+	} else {
+		log.Println("Queue empty, stopping playback")
 		mb.BotStatus = Resting
-		return
 	}
-
-	time.Sleep(250 * time.Millisecond)
-	log.Println("Play next in queue")
-	go mb.PlaySong(session, event)
 }
 
 func (mb *GuildAudioManager) Enqueue(session *discordgo.Session, event *discordgo.MessageCreate, song *Song) {
@@ -176,8 +282,11 @@ func (mb *GuildAudioManager) Dequeue() *Song {
 }
 
 func (mb *GuildAudioManager) Stop() {
-	mb.VoiceConn.Disconnect()
-	mb.VoiceConn = nil
+	if mb.VoiceConn != nil {
+		mb.StopPlayback <- true
+		mb.VoiceConn.Disconnect()
+		mb.VoiceConn = nil
+	}
 	mb.BotStatus = Resting
 }
 
@@ -186,8 +295,8 @@ func (mb *GuildAudioManager) Skip(session *discordgo.Session, event *discordgo.M
 		mb.Stop()
 	} else {
 		if len(mb.SkipInterrupt) == 0 {
+			mb.SkipInterrupt <- true
 			session.ChannelMessageSend(event.ChannelID, "Skipping current song.")
-			mb.CurrentEncodeSession.Cleanup()
 		}
 	}
 }
