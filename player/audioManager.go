@@ -67,8 +67,6 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 		return
 	}
 
-	// Use yt-dlp directly to stream audio to ffmpeg
-	// This command pipes the audio from yt-dlp directly to ffmpeg without saving to disk
 	ytdlp := exec.Command(
 		"yt-dlp",
 		"--no-playlist",
@@ -89,7 +87,6 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 		"pipe:1",
 	)
 
-	// Set up pipe between yt-dlp and ffmpeg
 	ytdlpout, err := ytdlp.StdoutPipe()
 	if err != nil {
 		log.Println("Error creating yt-dlp stdout pipe:", err)
@@ -98,7 +95,6 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 	}
 	ffmpeg.Stdin = ytdlpout
 
-	// Get ffmpeg output
 	ffmpegout, err := ffmpeg.StdoutPipe()
 	if err != nil {
 		log.Println("Error creating FFmpeg stdout pipe:", err)
@@ -106,11 +102,9 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 		return
 	}
 
-	// Set up error logging
 	ytdlp.Stderr = log.Writer()
 	ffmpeg.Stderr = log.Writer()
 
-	// Start yt-dlp
 	err = ytdlp.Start()
 	if err != nil {
 		log.Println("Error starting yt-dlp:", err)
@@ -118,7 +112,6 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 		return
 	}
 
-	// Start FFmpeg
 	err = ffmpeg.Start()
 	if err != nil {
 		log.Println("Error starting FFmpeg:", err)
@@ -127,7 +120,6 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 		return
 	}
 
-	// Create Opus encoder
 	opusEncoder, err := gopus.NewEncoder(frameRate, channels, gopus.Audio)
 	if err != nil {
 		log.Println("Error creating Opus encoder:", err)
@@ -137,16 +129,13 @@ func (mb *GuildAudioManager) PlaySong(session *discordgo.Session, event *discord
 		return
 	}
 
-	// Set the bitrate to 96 kbps (same as your DCA setting)
 	opusEncoder.SetBitrate(96000)
 
-	// Set the application to voice for low-delay (similar to your DCA setting)
 	opusEncoder.SetApplication(gopus.Voip)
 
 	// Buffer for reading PCM data
 	ffmpegbuf := make([]int16, frameSize*channels)
 
-	// Main playback loop
 	embed := &discordgo.MessageEmbed{
 		Title: ":notes: Now Playing",
 		Author: &discordgo.MessageEmbedAuthor{
